@@ -9,14 +9,23 @@ BASE_GROUND = BASE_H - 85
 class Dino:
     def __init__(self, canvas, x, y):
         self.canvas = canvas
+        self.x = x
+        self.y = y
         self.img = ImageTk.PhotoImage(Image.open("assets/dino.png").resize((100, 85)))
         self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
 
 class Obstacle:
-    def __init__(self, canvas, x, y):
+    def __init__(self, canvas, x, y, speed):
         self.canvas = canvas
+        self.x = x
+        self.y = y
+        self.speed = speed
         self.img = ImageTk.PhotoImage(Image.open("assets/cactus.png").resize((50, 85)))
         self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
+
+    def update(self):
+        self.x -= self.speed
+        self.canvas.coords(self.id, self.x, self.y)
 
 root = tk.Tk()
 root.geometry(f"{BASE_W}x{BASE_H}")
@@ -28,6 +37,11 @@ ground_img = ImageTk.PhotoImage(Image.open("assets/ground102.png").resize((BASE_
 canvas.create_image(0, BASE_GROUND - 10, image=ground_img, anchor="nw")
 
 dino = Dino(canvas, 150, BASE_GROUND - 85)
-obstacle = Obstacle(canvas, 800, BASE_GROUND - 85)
+obstacle = Obstacle(canvas, 800, BASE_GROUND - 85, speed=10)
 
+def game_loop():
+    obstacle.update()
+    root.after(50, game_loop)
+
+game_loop()
 root.mainloop()
