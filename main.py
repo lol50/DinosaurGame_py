@@ -5,6 +5,8 @@ import time
 
 BASE_W, BASE_H = 1200, 600
 BASE_GROUND = BASE_H - 85
+MIN_SPAWN_DELAY = 1800
+MAX_SPAWN_DELAY = 3200
 
 class Dino:
     def __init__(self, canvas, x, y):
@@ -22,10 +24,15 @@ class Obstacle:
         self.speed = speed
         self.img = ImageTk.PhotoImage(Image.open("assets/cactus.png").resize((50, 85)))
         self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
+        self.width = 50
 
     def update(self):
         self.x -= self.speed
         self.canvas.coords(self.id, self.x, self.y)
+        if self.x + self.width < 0:
+            self.canvas.delete(self.id)
+            return True
+        return False
 
 root = tk.Tk()
 root.geometry(f"{BASE_W}x{BASE_H}")
@@ -37,11 +44,22 @@ ground_img = ImageTk.PhotoImage(Image.open("assets/ground102.png").resize((BASE_
 canvas.create_image(0, BASE_GROUND - 10, image=ground_img, anchor="nw")
 
 dino = Dino(canvas, 150, BASE_GROUND - 85)
-obstacle = Obstacle(canvas, 800, BASE_GROUND - 85, speed=10)
+
+obstacles = []
+speed = 10
+
+def spawn_obstacle():
+    obs = Obstacle(canvas, BASE_W, BASE_GROUND - 85, speed)
+    obstacles.append(obs)
+    delay = random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY)
+    root.after(delay, spawn_obstacle)
 
 def game_loop():
-    obstacle.update()
+    for obs in obstacles[:]:
+        if obs.update():
+            obstacles.remove(obs)
     root.after(50, game_loop)
 
+spawn_obstacle()
 game_loop()
 root.mainloop()
