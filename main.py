@@ -13,8 +13,26 @@ class Dino:
         self.canvas = canvas
         self.x = x
         self.y = y
+        self.ground_y = y
+        self.vy = 0
+        self.jumping = False
         self.img = ImageTk.PhotoImage(Image.open("assets/dino.png").resize((100, 85)))
         self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
+
+    def jump(self):
+        if not self.jumping:
+            self.jumping = True
+            self.vy = -18
+
+    def update_physics(self):
+         if self.jumping:
+            self.vy += 1.2
+            self.y += self.vy
+            if self.y >= self.ground_y:
+                self.y = self.ground_y
+                self.jumping = False
+                self.vy = 0
+            self.canvas.coords(self.id, self.x, self.y)
 
 class Obstacle:
     def __init__(self, canvas, x, y, speed):
@@ -55,10 +73,17 @@ def spawn_obstacle():
     root.after(delay, spawn_obstacle)
 
 def game_loop():
+    dino.update_physics()
     for obs in obstacles[:]:
         if obs.update():
             obstacles.remove(obs)
     root.after(50, game_loop)
+
+def on_jump(event):
+    dino.jump()
+
+root.bind("<space>", on_jump)
+root.bind("<Up>", on_jump)
 
 spawn_obstacle()
 game_loop()
