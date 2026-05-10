@@ -54,7 +54,6 @@ class Obstacle:
 
 root = tk.Tk()
 root.geometry(f"{BASE_W}x{BASE_H}")
-
 canvas = tk.Canvas(root, width=BASE_W, height=BASE_H, bg="#87CEEB")
 canvas.pack()
 
@@ -65,6 +64,28 @@ dino = Dino(canvas, 150, BASE_GROUND - 85)
 
 obstacles = []
 speed = 10
+
+score = 0
+high_score = 0
+
+if os.path.exists("high_score.json"):
+    with open("high_score.json", "r") as f:
+        data = json.load(f)
+        high_score = data.get("high_score", 0)
+
+score_text = canvas.create_text(BASE_W - 80, 30, text=f"Счёт: {score}", font=("Arial", 18, "bold"), fill="black")
+high_score_text = canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {high_score}", font=("Arial", 14, "bold"), fill="black")
+
+def update_score():
+    global score, high_score
+    score += 1
+    canvas.itemconfig(score_text, text=f"Счёт: {score}")
+    if score > high_score:
+        high_score = score
+        canvas.itemconfig(high_score_text, text=f"Рекорд: {high_score}")
+        with open("high_score.json", "w") as f:
+            json.dump({"high_score": high_score}, f)
+    root.after(500, update_score)
 
 def spawn_obstacle():
     obs = Obstacle(canvas, BASE_W, BASE_GROUND - 85, speed)
@@ -86,5 +107,6 @@ root.bind("<space>", on_jump)
 root.bind("<Up>", on_jump)
 
 spawn_obstacle()
+update_score()
 game_loop()
 root.mainloop()
