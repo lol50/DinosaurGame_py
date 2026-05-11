@@ -64,6 +64,8 @@ dino = Dino(canvas, 150, BASE_GROUND - 85)
 
 obstacles = []
 speed = 10
+max_speed = 30
+next_speed_increase = 500
 
 score = 0
 high_score = 0
@@ -77,7 +79,7 @@ score_text = canvas.create_text(BASE_W - 80, 30, text=f"Счёт: {score}", font
 high_score_text = canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {high_score}", font=("Arial", 14, "bold"), fill="black")
 
 def update_score():
-    global score, high_score
+    global score, high_score, speed, next_speed_increase
     score += 1
     canvas.itemconfig(score_text, text=f"Счёт: {score}")
     if score > high_score:
@@ -85,6 +87,11 @@ def update_score():
         canvas.itemconfig(high_score_text, text=f"Рекорд: {high_score}")
         with open("high_score.json", "w") as f:
             json.dump({"high_score": high_score}, f)
+
+    if score >= next_speed_increase and speed < max_speed:
+        speed += 3
+        next_speed_increase += 500
+
     root.after(500, update_score)
 
 def spawn_obstacle():
