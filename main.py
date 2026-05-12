@@ -37,6 +37,12 @@ class Dino:
     def hitbox(self):
         return (self.x + 10, self.y + 10, self.x + 90, self.y + 75)
 
+    def reset(self):
+        self.y = self.ground_y
+        self.vy = 0
+        self.jumping = False
+        self.canvas.coords(self.id, self.x, self.y)
+
 class Obstacle:
     def __init__(self, canvas, x, y, speed):
         self.canvas = canvas
@@ -87,8 +93,9 @@ class DinoGame:
                                                        font=("Arial", 14, "bold"), fill="black")
 
         self.game_over = False
+        self.game_over_text = None
 
-        self.root.bind("<space>", self.on_jump)
+        self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_jump)
 
         self.spawn_obstacle()
@@ -136,8 +143,33 @@ class DinoGame:
             if (dino_box[0] < obs_box[2] and dino_box[2] > obs_box[0] and
                 dino_box[1] < obs_box[3] and dino_box[3] > obs_box[1]):
                 self.game_over = True
+                self.game_over = True
+                self.game_over_text = self.canvas.create_text(BASE_W // 2, BASE_H // 2,
+                                                              text="GAME OVER - PRESS SPACE",
+                                                              font=("Arial", 36, "bold"), fill="red")
                 return True
         return False
+
+    def restart_game(self):
+        self.game_over = False
+
+        if self.game_over_text:
+            self.canvas.delete(self.game_over_text)
+            self.game_over_text = None
+
+            for obs in self.obstacles[:]:
+                obs.update()
+                self.canvas.delete(obs.id)
+            self.obstacles.clear()
+
+            self.dino.reset()
+
+            self.score = 0
+            self.speed = 10
+            self.next_speed_increase = 500
+            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
+
+            self.spawn_obstacle()
 
     def game_loop(self):
         if not self.game_over:
@@ -150,6 +182,12 @@ class DinoGame:
 
     def on_jump(self, event):
         if not self.game_over:
+            self.dino.jump()
+
+    def on_space(self, event):
+        if self.game_over:
+            self.restart_game()
+        else:
             self.dino.jump()
 
 if __name__ == "__main__":
