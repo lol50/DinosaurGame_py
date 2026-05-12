@@ -65,6 +65,44 @@ class Obstacle:
     def hitbox(self):
         return (self.x + 10, self.y + 10, self.x + self.width - 10, self.y + self.height - 10)
 
+class Menu:
+    def __init__(self, canvas, game):
+        self.canvas = canvas
+        self.game = game
+        self.images = {}
+        self.items = []
+
+    def load(self):
+        try:
+            self.images['back'] = ImageTk.PhotoImage(
+                Image.open("assets/back.png").resize((BASE_W, BASE_H), Image.Resampling.LANCZOS))
+            self.images['title'] = ImageTk.PhotoImage(
+                Image.open("assets/dinosaurgamemenu.png").resize((500, 200), Image.Resampling.LANCZOS))
+            self.images['play'] = ImageTk.PhotoImage(
+                Image.open("assets/playmenu.png").resize((200, 50), Image.Resampling.LANCZOS))
+            self.images['exit'] = ImageTk.PhotoImage(
+                Image.open("assets/gooutmenu.png").resize((200, 50), Image.Resampling.LANCZOS))
+            return True
+        except:
+            return False
+
+    def show(self):
+        if not self.load():
+            return
+        self.bg = self.canvas.create_image(0, 0, image=self.images['back'], anchor="nw")
+        cx = BASE_W // 2
+        self.title = self.canvas.create_image(cx, 200, image=self.images['title'], anchor="center")
+        self.play_btn = self.canvas.create_image(cx, 440, image=self.images['play'], anchor="center")
+        self.exit_btn = self.canvas.create_image(cx, 500, image=self.images['exit'], anchor="center")
+        self.canvas.tag_bind(self.play_btn, "<Button-1>", self.game.start_game)
+        self.canvas.tag_bind(self.exit_btn, "<Button-1>", lambda e: sys.exit())
+        self.items = [self.bg, self.title, self.play_btn, self.exit_btn]
+
+    def hide(self):
+        for item in self.items:
+            self.canvas.delete(item)
+        self.items.clear()
+
 class DinoGame:
     def __init__(self, root):
         self.root = root
@@ -73,10 +111,7 @@ class DinoGame:
         self.canvas = tk.Canvas(root, width=BASE_W, height=BASE_H, bg="#87CEEB")
         self.canvas.pack()
 
-        self.ground_img = ImageTk.PhotoImage(Image.open("assets/ground102.png").resize((BASE_W, 100)))
-        self.canvas.create_image(0, BASE_GROUND - 10, image=self.ground_img, anchor="nw")
-
-        self.dino = Dino(self.canvas, 150, BASE_GROUND - 85)
+        self.game_started = False
 
         self.obstacles = []
         self.speed = 10
@@ -87,7 +122,6 @@ class DinoGame:
         self.high_score = 0
         self.load_high_score()
 
-        self.score_text = self.canvas.create_text(BASE_W - 80, 30, text=f"Счёт: {self.score}",
                                                   font=("Arial", 18, "bold"), fill="black")
         self.high_score_text = self.canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {self.high_score}",
                                                        font=("Arial", 14, "bold"), fill="black")
@@ -113,7 +147,7 @@ class DinoGame:
             json.dump({"high_score": self.high_score}, f)
 
     def update_score(self):
-        if self.game_over:
+        if self.game_over or not self.game_started:
             return
         self.score += 1
         self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
@@ -129,7 +163,7 @@ class DinoGame:
         self.root.after(500, self.update_score)
 
     def spawn_obstacle(self):
-        if self.game_over:
+        if self.game_over or not self.game_started:
             return
         obs = Obstacle(self.canvas, BASE_W, BASE_GROUND - 85, self.speed)
         self.obstacles.append(obs)
@@ -187,7 +221,9 @@ class DinoGame:
     def on_space(self, event):
         if self.game_over:
             self.restart_game()
-        else:
+        elif not self.game_started:
+            self.start_game()
+        elif self.dino:
             self.dino.jump()
 
 if __name__ == "__main__":
