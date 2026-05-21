@@ -14,6 +14,7 @@ class Dino:
         self.x = x
         self.y = y
         self.ground_y = y
+        self.ground = y
         self.vy = 0
         self.jumping = False
         self.img = ImageTk.PhotoImage(Image.open("assets/dino.png").resize((100, 85)))
@@ -30,6 +31,8 @@ class Dino:
             self.y += self.vy
             if self.y >= self.ground_y:
                 self.y = self.ground_y
+            if self.y >= self.ground:
+                self.y = self.ground
                 self.jumping = False
                 self.vy = 0
             self.canvas.coords(self.id, self.x, self.y)
@@ -39,6 +42,7 @@ class Dino:
 
     def reset(self):
         self.y = self.ground_y
+        self.y = self.ground
         self.vy = 0
         self.jumping = False
         self.canvas.coords(self.id, self.x, self.y)
@@ -111,30 +115,32 @@ class DinoGame:
         self.canvas = tk.Canvas(root, width=BASE_W, height=BASE_H, bg="#87CEEB")
         self.canvas.pack()
 
-        self.game_started = False
+        self.ground_img = ImageTk.PhotoImage(Image.open("assets/ground102.png").resize((BASE_W, 100)))
+        self.canvas.create_image(0, BASE_GROUND - 10, image=self.ground_img, anchor="nw")
 
+        self.menu = Menu(self.canvas, self)
+
+        self.dino = None
         self.obstacles = []
         self.speed = 10
         self.max_speed = 30
         self.next_speed_increase = 500
-
         self.score = 0
         self.high_score = 0
+        self.spawn_id = None
         self.load_high_score()
 
-                                                  font=("Arial", 18, "bold"), fill="black")
-        self.high_score_text = self.canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {self.high_score}",
-                                                       font=("Arial", 14, "bold"), fill="black")
-
+        self.score_text = None
+        self.high_score_text = None
         self.game_over = False
         self.game_over_text = None
 
         self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_jump)
+        self.menu.show()
 
-        self.spawn_obstacle()
-        self.update_score()
-        self.game_loop()
+        self.root.bind("<space>", self.on_space)
+        self.root.bind("<Up>", self.on_space)
 
     def load_high_score(self):
         if os.path.exists("high_score.json"):
@@ -146,14 +152,42 @@ class DinoGame:
         with open("high_score.json", "w") as f:
             json.dump({"high_score": self.high_score}, f)
 
+    def start_game(self, event=None):
+        self.menu.hide()
+
+        self.dino = Dino(self.canvas, 150, BASE_GROUND - 85)
+
+        self.score = 0
+        self.speed = 10
+        self.next_speed_increase = 500
+        self.obstacles.clear()
+        self.game_over = False
+
+        if self.game_over_text:
+            self.canvas.delete(self.game_over_text)
+            self.game_over_text = None
+        if self.spawn_id:
+            self.root.after_cancel(self.spawn_id)
+            self.spawn_id = None
+
+        self.score_text = self.canvas.create_text(BASE_W - 80, 30, text=f"Счёт: {self.score}",
+                                                  font=("Arial", 18, "bold"), fill="black")
+        self.high_score_text = self.canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {self.high_score}",
+                                                       font=("Arial", 14, "bold"), fill="black")
+
+        self.spawn_obstacle()
+        self.update()
+
     def update_score(self):
-        if self.game_over or not self.game_started:
+        if self.game_over:
             return
         self.score += 1
-        self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
+        if self.score_text:
+            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
         if self.score > self.high_score:
             self.high_score = self.score
-            self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
+            if self.high_score_text:
+                self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
             self.save_high_score()
 
         if self.score >= self.next_speed_increase and self.speed < self.max_speed:
@@ -163,66 +197,73 @@ class DinoGame:
         self.root.after(500, self.update_score)
 
     def spawn_obstacle(self):
-        if self.game_over or not self.game_started:
+        if self.game_over:
             return
         obs = Obstacle(self.canvas, BASE_W, BASE_GROUND - 85, self.speed)
         self.obstacles.append(obs)
         delay = random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY)
         self.root.after(delay, self.spawn_obstacle)
 
-    def check_collisions(self):
-        dino_box = self.dino.hitbox()
-        for obs in self.obstacles:
-            obs_box = obs.hitbox()
-            if (dino_box[0] < obs_box[2] and dino_box[2] > obs_box[0] and
-                dino_box[1] < obs_box[3] and dino_box[3] > obs_box[1]):
-                self.game_over = True
-                self.game_over = True
-                self.game_over_text = self.canvas.create_text(BASE_W // 2, BASE_H // 2,
-                                                              text="GAME OVER - PRESS SPACE",
-                                                              font=("Arial", 36, "bold"), fill="red")
-                return True
-        return False
+    def update(self):
+        if not self.game_over and self.dino:
+            self.dino.update()
+            for obs in self.obstacles[:]:
+                if obs.update():
+                    self.obstacles.remove(obs)
+
+            dl, dt, dr, db = self.dino.hitbox()
+            for obs in self.obstacles:
+                ol, ot, or_, ob = obs.hitbox()
+                if dl < or_ and dr > ol and dt < ob and db > ot:
+                    self.game_over = True
+                    self.game_over_text = self.canvas.create_text(BASE_W // 2, BASE_H // 2,
+                                                                  text="GAME OVER - PRESS SPACE",
+                                                                  font=("Arial", 36, "bold"), fill="red")
+                    break
+
+            self.score += 1
+            if self.score_text:
+                self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
+            if self.score > self.high_score:
+                self.high_score = self.score
+                if self.high_score_text:
+                    self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
+                self.save_high_score()
+            if self.score >= self.next_speed_increase and self.speed < self.max_speed:
+                self.speed += 3
+                self.next_speed_increase += 500
+
+        self.root.after(50, self.update)
 
     def restart_game(self):
+        if self.spawn_id:
+            self.root.after_cancel(self.spawn_id)
+            self.spawn_id = None
+
+        for obs in self.obstacles[:]:
+            self.canvas.delete(obs.id)
+        self.obstacles.clear()
+
+        if self.dino:
+            self.dino.reset()
+
+        self.score = 0
+        self.speed = 10
+        self.next_speed_increase = 500
         self.game_over = False
+
+        if self.score_text:
+            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
 
         if self.game_over_text:
             self.canvas.delete(self.game_over_text)
             self.game_over_text = None
 
-            for obs in self.obstacles[:]:
-                obs.update()
-                self.canvas.delete(obs.id)
-            self.obstacles.clear()
-
-            self.dino.reset()
-
-            self.score = 0
-            self.speed = 10
-            self.next_speed_increase = 500
-            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
-
-            self.spawn_obstacle()
-
-    def game_loop(self):
-        if not self.game_over:
-            self.dino.update_physics()
-            for obs in self.obstacles[:]:
-                if obs.update():
-                    self.obstacles.remove(obs)
-            self.check_collisions()
-            self.root.after(50, self.game_loop)
-
-    def on_jump(self, event):
-        if not self.game_over:
-            self.dino.jump()
+        self.spawn_obstacle()
 
     def on_space(self, event):
         if self.game_over:
             self.restart_game()
-        elif not self.game_started:
-            self.start_game()
         elif self.dino:
             self.dino.jump()
 
