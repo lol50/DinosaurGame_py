@@ -216,9 +216,10 @@ class DinoGame:
             'cactus1': (50, 85),
             'cactus2': (90, 85),
             'cactus3': (130, 85),
+            'bird': (75, 55)
         }
         for name, file in [('cactus1', 'cactus.png'), ('cactus2', 'cactus2.png'),
-                           ('cactus3', 'cactus3.png')]:
+                           ('cactus3', 'cactus3.png'), ('bird', 'bird.png')]:
             try:
                 w, h = sizes[name]
                 img = Image.open(f"assets/{file}").resize((w, h), Image.Resampling.LANCZOS)
@@ -274,11 +275,19 @@ class DinoGame:
         if self.game_over:
             return
 
-        typ = random.choice(['cactus1', 'cactus2', 'cactus3'])
-        img = self.tex[typ]
-        w = self.tex[typ].width()
-        y = BASE_GROUND - 85
-        h = 85
+        r = random.randint(1, 100)
+
+        if self.score >= 500 and r <= 30:
+            img = self.tex['bird']
+            w = self.tex['bird'].width()
+            h = 55
+            y = BASE_GROUND - random.choice([170, 140, 110])
+        else:
+            typ = random.choice(['cactus1', 'cactus2', 'cactus3'])
+            img = self.tex[typ]
+            w = self.tex[typ].width()
+            y = BASE_GROUND - 85
+            h = 85
 
         self.obstacles.append(Obstacle(self.canvas, BASE_W, y, img, w, h, self.speed))
         delay = max(800, random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY) - int(self.speed * 3))
