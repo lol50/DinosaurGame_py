@@ -13,17 +13,25 @@ class Dino:
         self.canvas = canvas
         self.x = x
         self.y = y
-        self.ground = y
+        self.dino_h = 85
+        self.duck_h = 60
+        self.ground = y + self.dino_h
         self.vy = 0
         self.jumping = False
         self.frame = 0
         self.counter = 0
         self.tex = {}
+        self.ducking = False
 
         run1 = Image.open("assets/dinomove1.png").resize((100, 85))
         run2 = Image.open("assets/dinomove2.png").resize((100, 85))
         self.tex['run1'] = ImageTk.PhotoImage(run1)
         self.tex['run2'] = ImageTk.PhotoImage(run2)
+
+        duck1 = Image.open("assets/dino2move1.png").resize((100, self.duck_h))
+        duck2 = Image.open("assets/dino2move2.png").resize((100, self.duck_h))
+        self.tex['duck1'] = ImageTk.PhotoImage(duck1)
+        self.tex['duck2'] = ImageTk.PhotoImage(duck2)
 
         self.cur = self.tex['run1']
         self.id = canvas.create_image(x, y, image=self.cur, anchor="nw")
@@ -33,20 +41,37 @@ class Dino:
         if self.counter >= 6:
             self.counter = 0
             self.frame += 1
-            self.cur = self.tex['run2'] if self.frame % 2 else self.tex['run1']
+            if self.ducking:
+                self.cur = self.tex['duck2'] if self.frame % 2 else self.tex['duck1']
+            else:
+                self.cur = self.tex['run2'] if self.frame % 2 else self.tex['run1']
             self.canvas.itemconfig(self.id, image=self.cur)
 
     def jump(self):
-        if not self.jumping:
+        if not self.jumping and not self.ducking:
             self.jumping = True
             self.vy = -18
+
+    def start_duck(self):
+        if not self.jumping:
+            self.ducking = True
+            self.canvas.coords(self.id, self.x, self.ground - self.dino_h + (self.dino_h - self.duck_h))
+            self.cur = self.tex['duck1']
+            self.canvas.itemconfig(self.id, image=self.cur)
+
+    def stop_duck(self):
+        if not self.jumping:
+            self.ducking = False
+            self.canvas.coords(self.id, self.x, self.ground - self.dino_h)
+            self.cur = self.tex['run1']
+            self.canvas.itemconfig(self.id, image=self.cur)
 
     def update(self):
         if self.jumping:
             self.vy += 1.2
             self.y += self.vy
-            if self.y >= self.ground:
-                self.y = self.ground
+            if self.y >= self.ground - self.dino_h:
+                self.y = self.ground- self.dino_h
                 self.jumping = False
                 self.vy = 0
                 self.frame = 0
@@ -59,12 +84,15 @@ class Dino:
 
 
     def hitbox(self):
+        if self.ducking:
+            return (self.x + 10, self.ground - self.duck_h + 10, self.x + 90, self.ground - self.duck_h + 50)
         return (self.x + 10, self.y + 10, self.x + 90, self.y + 75)
 
     def reset(self):
-        self.y = self.ground
+        self.y = self.ground - self.dino_h
         self.vy = 0
         self.jumping = False
+        self.ducking = False
         self.frame = 0
         self.counter = 0
         self.cur = self.tex['run1']
@@ -163,6 +191,8 @@ class DinoGame:
 
         self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_space)
+        self.root.bind("<Down>", self.handle_down)
+        self.root.bind("<KeyRelease-Down>", self.handle_down_release)
 
     def load_high_score(self):
         if os.path.exists("high_score.json"):
@@ -199,6 +229,14 @@ class DinoGame:
 
         self.spawn_obstacle()
         self.update()
+
+    def handle_down(self, e):
+        if not self.game_over and self.dino:
+            self.dino.start_duck()
+
+    def handle_down_release(self, e):
+        if not self.game_over and self.dino:
+            self.dino.stop_duck()
 
     def spawn_obstacle(self):
         if self.game_over:
