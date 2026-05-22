@@ -13,7 +13,6 @@ class Dino:
         self.canvas = canvas
         self.x = x
         self.y = y
-        self.ground_y = y
         self.ground = y
         self.vy = 0
         self.jumping = False
@@ -42,14 +41,10 @@ class Dino:
             self.jumping = True
             self.vy = -18
 
-    def update_physics(self):
-         if self.jumping:
     def update(self):
         if self.jumping:
             self.vy += 1.2
             self.y += self.vy
-            if self.y >= self.ground_y:
-                self.y = self.ground_y
             if self.y >= self.ground:
                 self.y = self.ground
                 self.jumping = False
@@ -67,7 +62,6 @@ class Dino:
         return (self.x + 10, self.y + 10, self.x + 90, self.y + 75)
 
     def reset(self):
-        self.y = self.ground_y
         self.y = self.ground
         self.vy = 0
         self.jumping = False
@@ -165,8 +159,6 @@ class DinoGame:
         self.game_over = False
         self.game_over_text = None
 
-        self.root.bind("<space>", self.on_space)
-        self.root.bind("<Up>", self.on_jump)
         self.menu.show()
 
         self.root.bind("<space>", self.on_space)
@@ -208,31 +200,13 @@ class DinoGame:
         self.spawn_obstacle()
         self.update()
 
-    def update_score(self):
-        if self.game_over:
-            return
-        self.score += 1
-        if self.score_text:
-            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
-        if self.score > self.high_score:
-            self.high_score = self.score
-            if self.high_score_text:
-                self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
-            self.save_high_score()
-
-        if self.score >= self.next_speed_increase and self.speed < self.max_speed:
-            self.speed += 3
-            self.next_speed_increase += 500
-
-        self.root.after(500, self.update_score)
-
     def spawn_obstacle(self):
         if self.game_over:
             return
         obs = Obstacle(self.canvas, BASE_W, BASE_GROUND - 85, self.speed)
         self.obstacles.append(obs)
-        delay = random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY)
-        self.root.after(delay, self.spawn_obstacle)
+        delay = max(800, random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY) - int(self.speed * 3))
+        self.spawn_id = self.root.after(delay, self.spawn_obstacle)
 
     def update(self):
         if not self.game_over and self.dino:
