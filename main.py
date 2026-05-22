@@ -114,15 +114,15 @@ class Dino:
         self.canvas.coords(self.id, self.x, self.y)
 
 class Obstacle:
-    def __init__(self, canvas, x, y, speed):
+    def __init__(self, canvas, x, y, img, w, h, speed):
         self.canvas = canvas
         self.x = x
         self.y = y
         self.speed = speed
-        self.img = ImageTk.PhotoImage(Image.open("assets/cactus.png").resize((50, 85)))
+        self.img = img
         self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
-        self.width = 50
-        self.height = 85
+        self.width = w
+        self.height = h
 
     def update(self):
         self.x -= self.speed
@@ -188,6 +188,7 @@ class DinoGame:
 
         self.dino = None
         self.obstacles = []
+        self.tex = {}
         self.speed = 10
         self.max_speed = 30
         self.next_speed_increase = 500
@@ -201,12 +202,29 @@ class DinoGame:
         self.game_over = False
         self.game_over_text = None
 
+        self.load_obstacle_tex()
+
         self.menu.show()
 
         self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_space)
         self.root.bind("<Down>", self.handle_down)
         self.root.bind("<KeyRelease-Down>", self.handle_down_release)
+
+    def load_obstacle_tex(self):
+        sizes = {
+            'cactus1': (50, 85),
+            'cactus2': (90, 85),
+            'cactus3': (130, 85),
+        }
+        for name, file in [('cactus1', 'cactus.png'), ('cactus2', 'cactus2.png'),
+                           ('cactus3', 'cactus3.png')]:
+            try:
+                w, h = sizes[name]
+                img = Image.open(f"assets/{file}").resize((w, h), Image.Resampling.LANCZOS)
+                self.tex[name] = ImageTk.PhotoImage(img)
+            except:
+                pass
 
     def load_high_score(self):
         if os.path.exists("high_score.json"):
@@ -255,8 +273,14 @@ class DinoGame:
     def spawn_obstacle(self):
         if self.game_over:
             return
-        obs = Obstacle(self.canvas, BASE_W, BASE_GROUND - 85, self.speed)
-        self.obstacles.append(obs)
+
+        typ = random.choice(['cactus1', 'cactus2', 'cactus3'])
+        img = self.tex[typ]
+        w = self.tex[typ].width()
+        y = BASE_GROUND - 85
+        h = 85
+
+        self.obstacles.append(Obstacle(self.canvas, BASE_W, y, img, w, h, self.speed))
         delay = max(800, random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY) - int(self.speed * 3))
         self.spawn_id = self.root.after(delay, self.spawn_obstacle)
 
