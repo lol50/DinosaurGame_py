@@ -17,8 +17,25 @@ class Dino:
         self.ground = y
         self.vy = 0
         self.jumping = False
-        self.img = ImageTk.PhotoImage(Image.open("assets/dino.png").resize((100, 85)))
-        self.id = canvas.create_image(x, y, image=self.img, anchor="nw")
+        self.frame = 0
+        self.counter = 0
+        self.tex = {}
+
+        run1 = Image.open("assets/dinomove1.png").resize((100, 85))
+        run2 = Image.open("assets/dinomove2.png").resize((100, 85))
+        self.tex['run1'] = ImageTk.PhotoImage(run1)
+        self.tex['run2'] = ImageTk.PhotoImage(run2)
+
+        self.cur = self.tex['run1']
+        self.id = canvas.create_image(x, y, image=self.cur, anchor="nw")
+
+    def update_animation(self):
+        self.counter += 1
+        if self.counter >= 6:
+            self.counter = 0
+            self.frame += 1
+            self.cur = self.tex['run2'] if self.frame % 2 else self.tex['run1']
+            self.canvas.itemconfig(self.id, image=self.cur)
 
     def jump(self):
         if not self.jumping:
@@ -27,6 +44,8 @@ class Dino:
 
     def update_physics(self):
          if self.jumping:
+    def update(self):
+        if self.jumping:
             self.vy += 1.2
             self.y += self.vy
             if self.y >= self.ground_y:
@@ -35,7 +54,14 @@ class Dino:
                 self.y = self.ground
                 self.jumping = False
                 self.vy = 0
+                self.frame = 0
+                self.counter = 0
+                self.cur = self.tex['run1']
+                self.canvas.itemconfig(self.id, image=self.cur)
             self.canvas.coords(self.id, self.x, self.y)
+        else:
+            self.update_animation()
+
 
     def hitbox(self):
         return (self.x + 10, self.y + 10, self.x + 90, self.y + 75)
@@ -45,6 +71,10 @@ class Dino:
         self.y = self.ground
         self.vy = 0
         self.jumping = False
+        self.frame = 0
+        self.counter = 0
+        self.cur = self.tex['run1']
+        self.canvas.itemconfig(self.id, image=self.cur)
         self.canvas.coords(self.id, self.x, self.y)
 
 class Obstacle:
