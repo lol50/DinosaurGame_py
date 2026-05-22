@@ -33,6 +33,11 @@ class Dino:
         self.tex['duck1'] = ImageTk.PhotoImage(duck1)
         self.tex['duck2'] = ImageTk.PhotoImage(duck2)
 
+        dead = Image.open("assets/dinodead.png").resize((100, self.dino_h))
+        dead_duck = Image.open("assets/dino2dead.png").resize((100, self.duck_h))
+        self.tex['dead'] = ImageTk.PhotoImage(dead)
+        self.tex['dead_duck'] = ImageTk.PhotoImage(dead_duck)
+
         self.cur = self.tex['run1']
         self.id = canvas.create_image(x, y, image=self.cur, anchor="nw")
 
@@ -65,6 +70,15 @@ class Dino:
             self.canvas.coords(self.id, self.x, self.ground - self.dino_h)
             self.cur = self.tex['run1']
             self.canvas.itemconfig(self.id, image=self.cur)
+
+    def set_dead(self):
+        if self.ducking:
+            self.cur = self.tex['dead_duck']
+        else:
+            self.cur = self.tex['dead']
+        self.canvas.itemconfig(self.id, image=self.cur)
+        self.jumping = False
+        self.ducking = False
 
     def update(self):
         if self.jumping:
@@ -258,6 +272,7 @@ class DinoGame:
                 ol, ot, or_, ob = obs.hitbox()
                 if dl < or_ and dr > ol and dt < ob and db > ot:
                     self.game_over = True
+                    self.dino.set_dead()
                     self.game_over_text = self.canvas.create_text(BASE_W // 2, BASE_H // 2,
                                                                   text="GAME OVER - PRESS SPACE",
                                                                   font=("Arial", 36, "bold"), fill="red")
