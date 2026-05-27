@@ -171,6 +171,46 @@ class Obstacle:
     def hitbox(self):
         return (self.x + 10, self.y + 10, self.x + self.width - 10, self.y + self.height - 10)
 
+class GameOver:
+    def __init__(self, canvas, game):
+        self.canvas = canvas
+        self.game = game
+        self.images = {}
+        self.ids = {}
+
+    def load(self):
+        try:
+            bg_w = int(300 * self.game.scale_x) if hasattr(self.game, 'scale_x') else 300
+            bg_h = int(300 * self.game.scale_y) if hasattr(self.game, 'scale_y') else 300
+            btn_w = int(200 * self.game.scale_x) if hasattr(self.game, 'scale_x') else 200
+            btn_h = int(50 * self.game.scale_y) if hasattr(self.game, 'scale_y') else 50
+
+            self.images['bg'] = ImageTk.PhotoImage(
+                Image.open("assets/gameovercanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
+            self.images['restart'] = ImageTk.PhotoImage(
+                Image.open("assets/go.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['menu'] = ImageTk.PhotoImage(
+                Image.open("assets/gomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            return True
+        except:
+            return False
+
+    def show(self):
+        if not self.load():
+            return
+        cx, cy = BASE_W // 2, BASE_H // 2
+        self.ids['bg'] = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
+        self.ids['restart'] = self.canvas.create_image(cx, cy + 60, image=self.images['restart'], anchor="center")
+        self.ids['menu'] = self.canvas.create_image(cx, cy + 120, image=self.images['menu'], anchor="center")
+
+        self.canvas.tag_bind(self.ids['restart'], "<Button-1>", self.game.restart_from_game_over)
+        self.canvas.tag_bind(self.ids['menu'], "<Button-1>", self.game.menu_from_game_over)
+
+    def hide(self):
+        for key in list(self.ids.keys()):
+            self.canvas.delete(self.ids[key])
+        self.ids.clear()
+
 class Menu:
     def __init__(self, canvas, game):
         self.canvas = canvas
@@ -228,6 +268,7 @@ class DinoGame:
         self.canvas.create_image(0, BASE_GROUND - 10, image=self.ground_img, anchor="nw")
 
         self.menu = Menu(self.canvas, self)
+        self.game_over = GameOver(self.canvas, self)
 
         self.dino = None
         self.obstacles = []
@@ -242,7 +283,7 @@ class DinoGame:
 
         self.score_text = None
         self.high_score_text = None
-        self.game_over = False
+        self.game_over_flag = False
         self.game_over_text = None
 
         self.load_obstacle_tex()
@@ -289,7 +330,7 @@ class DinoGame:
         self.speed = 10
         self.next_speed_increase = 500
         self.obstacles.clear()
-        self.game_over = False
+        self.game_over_flag = False
 
         if self.game_over_text:
             self.canvas.delete(self.game_over_text)
@@ -307,15 +348,15 @@ class DinoGame:
         self.update()
 
     def handle_down(self, e):
-        if not self.game_over and self.dino:
+        if not self.game_over_flag and self.dino:
             self.dino.start_duck()
 
     def handle_down_release(self, e):
-        if not self.game_over and self.dino:
+        if not self.game_over_flag and self.dino:
             self.dino.stop_duck()
 
     def spawn_obstacle(self):
-        if self.game_over:
+        if self.game_over_flag:
             return
 
         r = random.randint(1, 100)
@@ -337,7 +378,7 @@ class DinoGame:
         self.spawn_id = self.root.after(delay, self.spawn_obstacle)
 
     def update(self):
-        if not self.game_over and self.dino:
+        if not self.game_over_flag and self.dino:
             for layer in self.bg_layers:
                 layer.update(self.speed)
 
@@ -350,12 +391,13 @@ class DinoGame:
             for obs in self.obstacles:
                 ol, ot, or_, ob = obs.hitbox()
                 if dl < or_ and dr > ol and dt < ob and db > ot:
-                    self.game_over = True
+                    self.game_over_flag = True
                     self.dino.set_dead()
-                    self.game_over_text = self.canvas.create_text(BASE_W // 2, BASE_H // 2,
-                                                                  text="GAME OVER - PRESS SPACE",
-                                                                  font=("Arial", 36, "bold"), fill="red")
-                    break
+                    self.game_over.show()
+                    if self.spawn_id:
+                        self.root.after_cancel(self.spawn_id)
+                        self.spawn_id = None
+                    return
 
             self.score += 1
             if self.score_text:
@@ -371,7 +413,17 @@ class DinoGame:
 
         self.root.after(50, self.update)
 
-    def restart_game(self):
+    def restart_from_game_over(self, e):
+        self.game_over.hide()
+        self.full_restart()
+        self.start_game()
+
+    def menu_from_game_over(self, e):
+        self.game_over.hide()
+        self.full_restart()
+        self.menu.show()
+
+    def full_restart(self):
         if self.spawn_id:
             self.root.after_cancel(self.spawn_id)
             self.spawn_id = None
@@ -389,20 +441,22 @@ class DinoGame:
         self.score = 0
         self.speed = 10
         self.next_speed_increase = 500
-        self.game_over = False
+        self.game_over_flag = False
 
         if self.score_text:
-            self.canvas.itemconfig(self.score_text, text=f"Счёт: {self.score}")
+            self.canvas.delete(self.score_text)
+            self.score_text = None
+        if self.high_score_text:
+            self.canvas.delete(self.high_score_text)
+            self.high_score_text = None
 
         if self.game_over_text:
             self.canvas.delete(self.game_over_text)
             self.game_over_text = None
 
-        self.spawn_obstacle()
-
     def on_space(self, event):
-        if self.game_over:
-            self.restart_game()
+        if self.game_over_flag:
+            self.restart_from_game_over(event)
         elif self.dino:
             self.dino.jump()
 
