@@ -8,6 +8,42 @@ BASE_GROUND = BASE_H - 85
 MIN_SPAWN_DELAY = 1800
 MAX_SPAWN_DELAY = 3200
 
+class ParallaxLayer:
+    def __init__(self, canvas, path, speed, y=0, w=None, h=None, game=None):
+        self.canvas = canvas
+        self.game = game
+        self.speed = speed
+        self.w = w or game.W
+        self.h = h or game.H - y
+        self.y = y
+        self.x1, self.x2 = 0, self.w
+        try:
+            img = Image.open(path).resize((self.w, self.h), Image.Resampling.LANCZOS)
+            self.img = ImageTk.PhotoImage(img)
+        except:
+            self.img = None
+            return
+        self.id1 = canvas.create_image(0, self.y, image=self.img, anchor="nw")
+        self.id2 = canvas.create_image(self.w, self.y, image=self.img, anchor="nw")
+
+    def update(self, speed):
+        if not self.img:
+            return
+        move = speed * self.speed / 8
+        self.x1 -= move
+        self.x2 -= move
+        if self.x1 <= -self.w:
+            self.x1 = self.x2 + self.w
+        if self.x2 <= -self.w:
+            self.x2 = self.x1 + self.w
+        self.canvas.coords(self.id1, self.x1, self.y)
+        self.canvas.coords(self.id2, self.x2, self.y)
+
+    def reset(self):
+        self.x1, self.x2 = 0, self.w
+        self.canvas.coords(self.id1, 0, self.y)
+        self.canvas.coords(self.id2, self.w, self.y)
+
 class Dino:
     def __init__(self, canvas, x, y):
         self.canvas = canvas
@@ -181,6 +217,13 @@ class DinoGame:
         self.canvas = tk.Canvas(root, width=BASE_W, height=BASE_H, bg="#87CEEB")
         self.canvas.pack()
 
+        self.bg_layers = [
+            ParallaxLayer(self.canvas, "assets/back101.png", 1, 0, BASE_W, BASE_H, self),
+            ParallaxLayer(self.canvas, "assets/back102.png", 2, 0, BASE_W, BASE_H, self),
+            ParallaxLayer(self.canvas, "assets/back103.png", 3, 0, BASE_W, BASE_H, self),
+            ParallaxLayer(self.canvas, "assets/back104.png", 4, 0, BASE_W, BASE_H, self),
+        ]
+
         self.ground_img = ImageTk.PhotoImage(Image.open("assets/ground102.png").resize((BASE_W, 100)))
         self.canvas.create_image(0, BASE_GROUND - 10, image=self.ground_img, anchor="nw")
 
@@ -295,6 +338,9 @@ class DinoGame:
 
     def update(self):
         if not self.game_over and self.dino:
+            for layer in self.bg_layers:
+                layer.update(self.speed)
+
             self.dino.update()
             for obs in self.obstacles[:]:
                 if obs.update():
@@ -333,6 +379,9 @@ class DinoGame:
         for obs in self.obstacles[:]:
             self.canvas.delete(obs.id)
         self.obstacles.clear()
+
+        for layer in self.bg_layers:
+            layer.reset()
 
         if self.dino:
             self.dino.reset()
