@@ -249,6 +249,46 @@ class Menu:
             self.canvas.delete(item)
         self.items.clear()
 
+class PauseMenu:
+    def __init__(self, canvas, game):
+        self.canvas = canvas
+        self.game = game
+        self.images = {}
+        self.ids = {}
+
+    def load(self):
+        try:
+            bg_w = int(300 * self.game.scale_x) if hasattr(self.game, 'scale_x') else 300
+            bg_h = int(300 * self.game.scale_y) if hasattr(self.game, 'scale_y') else 300
+            btn_w = int(200 * self.game.scale_x) if hasattr(self.game, 'scale_x') else 200
+            btn_h = int(50 * self.game.scale_y) if hasattr(self.game, 'scale_y') else 50
+
+            self.images['bg'] = ImageTk.PhotoImage(
+                Image.open("assets/pausecanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
+            self.images['continue'] = ImageTk.PhotoImage(
+                Image.open("assets/letsgo.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['menu'] = ImageTk.PhotoImage(
+                Image.open("assets/pausegomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            return True
+        except:
+            return False
+
+    def show(self):
+        if not self.load():
+            return
+        cx, cy = BASE_W // 2, BASE_H // 2
+        self.ids['bg'] = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
+        self.ids['continue'] = self.canvas.create_image(cx, cy + 60, image=self.images['continue'], anchor="center")
+        self.ids['menu'] = self.canvas.create_image(cx, cy + 120, image=self.images['menu'], anchor="center")
+
+        self.canvas.tag_bind(self.ids['continue'], "<Button-1>", self.game.resume_game)
+        self.canvas.tag_bind(self.ids['menu'], "<Button-1>", self.game.menu_from_pause)
+
+    def hide(self):
+        for key in list(self.ids.keys()):
+            self.canvas.delete(self.ids[key])
+        self.ids.clear()
+
 class DinoGame:
     def __init__(self, root):
         self.root = root
@@ -290,10 +330,16 @@ class DinoGame:
 
         self.menu.show()
 
+        self.pause_menu = PauseMenu(self.canvas, self)
+        self.paused = False
+        self.pause_btn = None
+        self.pause_icon = None
+
         self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_space)
         self.root.bind("<Down>", self.handle_down)
         self.root.bind("<KeyRelease-Down>", self.handle_down_release)
+        self.root.bind("<Escape>", self.toggle_pause)
 
     def load_obstacle_tex(self):
         sizes = {
@@ -344,6 +390,14 @@ class DinoGame:
         self.high_score_text = self.canvas.create_text(BASE_W - 80, 60, text=f"Рекорд: {self.high_score}",
                                                        font=("Arial", 14, "bold"), fill="black")
 
+        try:
+            icon = ImageTk.PhotoImage(Image.open("assets/pause.png").resize((35, 35)))
+            self.pause_icon = icon
+            self.pause_btn = self.canvas.create_image(BASE_W // 2, 25, image=icon, anchor="center")
+            self.canvas.tag_bind(self.pause_btn, "<Button-1>", self.toggle_pause)
+        except:
+            pass
+
         self.spawn_obstacle()
         self.update()
 
@@ -356,7 +410,7 @@ class DinoGame:
             self.dino.stop_duck()
 
     def spawn_obstacle(self):
-        if self.game_over_flag:
+        if self.game_over_flag or self.paused:
             return
 
         r = random.randint(1, 100)
@@ -378,7 +432,7 @@ class DinoGame:
         self.spawn_id = self.root.after(delay, self.spawn_obstacle)
 
     def update(self):
-        if not self.game_over_flag and self.dino:
+        if not self.paused and not self.game_over_flag and self.dino:
             for layer in self.bg_layers:
                 layer.update(self.speed)
 
@@ -423,6 +477,29 @@ class DinoGame:
         self.full_restart()
         self.menu.show()
 
+    def toggle_pause(self, event=None):
+        if self.game_over_flag:
+            return
+        if not self.paused:
+            self.paused = True
+            if self.spawn_id:
+                self.root.after_cancel(self.spawn_id)
+                self.spawn_id = None
+            self.pause_menu.show()
+        else:
+            self.resume_game()
+
+    def resume_game(self, event=None):
+        self.pause_menu.hide()
+        self.paused = False
+        if not self.game_over_flag and self.spawn_id is None:
+            self.spawn_obstacle()
+
+    def menu_from_pause(self, event=None):
+        self.pause_menu.hide()
+        self.full_restart()
+        self.menu.show()
+
     def full_restart(self):
         if self.spawn_id:
             self.root.after_cancel(self.spawn_id)
@@ -442,6 +519,11 @@ class DinoGame:
         self.speed = 10
         self.next_speed_increase = 500
         self.game_over_flag = False
+
+        self.paused = False
+        if self.pause_btn:
+            self.canvas.delete(self.pause_btn)
+            self.pause_btn = None
 
         if self.score_text:
             self.canvas.delete(self.score_text)
