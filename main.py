@@ -309,6 +309,7 @@ class DinoGame:
 
         self.menu = Menu(self.canvas, self)
         self.game_over = GameOver(self.canvas, self)
+        self.pause_menu = PauseMenu(self.canvas, self)
 
         self.dino = None
         self.obstacles = []
@@ -326,14 +327,15 @@ class DinoGame:
         self.game_over_flag = False
         self.game_over_text = None
 
-        self.load_obstacle_tex()
-
-        self.menu.show()
-
-        self.pause_menu = PauseMenu(self.canvas, self)
         self.paused = False
         self.pause_btn = None
         self.pause_icon = None
+        self.pause_remaining = 0
+        self.next_spawn_time = 0
+
+        self.load_obstacle_tex()
+
+        self.menu.show()
 
         self.root.bind("<space>", self.on_space)
         self.root.bind("<Up>", self.on_space)
@@ -402,11 +404,11 @@ class DinoGame:
         self.update()
 
     def handle_down(self, e):
-        if not self.game_over_flag and self.dino:
+        if not self.game_over_flag and not self.paused and self.dino:
             self.dino.start_duck()
 
     def handle_down_release(self, e):
-        if not self.game_over_flag and self.dino:
+        if not self.game_over_flag and not self.paused and self.dino:
             self.dino.stop_duck()
 
     def spawn_obstacle(self):
@@ -429,6 +431,7 @@ class DinoGame:
 
         self.obstacles.append(Obstacle(self.canvas, BASE_W, y, img, w, h, self.speed))
         delay = max(800, random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY) - int(self.speed * 3))
+        self.next_spawn_time = time.time() * 1000 + delay
         self.spawn_id = self.root.after(delay, self.spawn_obstacle)
 
     def update(self):
@@ -485,6 +488,8 @@ class DinoGame:
             if self.spawn_id:
                 self.root.after_cancel(self.spawn_id)
                 self.spawn_id = None
+                now = time.time() * 1000
+                self.pause_remaining = max(0, self.next_spawn_time - now)
             self.pause_menu.show()
         else:
             self.resume_game()
@@ -493,7 +498,11 @@ class DinoGame:
         self.pause_menu.hide()
         self.paused = False
         if not self.game_over_flag and self.spawn_id is None:
-            self.spawn_obstacle()
+            if self.pause_remaining > 0:
+                self.spawn_id = self.root.after(int(self.pause_remaining), self.spawn_obstacle)
+            else:
+                self.spawn_obstacle()
+            self.pause_remaining = 0
 
     def menu_from_pause(self, event=None):
         self.pause_menu.hide()
@@ -524,6 +533,8 @@ class DinoGame:
         if self.pause_btn:
             self.canvas.delete(self.pause_btn)
             self.pause_btn = None
+        self.pause_remaining = 0
+        self.next_spawn_time = 0
 
         if self.score_text:
             self.canvas.delete(self.score_text)
@@ -539,7 +550,7 @@ class DinoGame:
     def on_space(self, event):
         if self.game_over_flag:
             self.restart_from_game_over(event)
-        elif self.dino:
+        elif not self.paused and self.dino:
             self.dino.jump()
 
 if __name__ == "__main__":
