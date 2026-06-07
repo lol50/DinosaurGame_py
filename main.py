@@ -139,13 +139,13 @@ class Dino:
         self.canvas.itemconfig(self.id, image=self.cur)
 
     def hitbox(self):
-        back_off = int(10 * self.game.scale_x)
-        front_off = int(2 * self.game.scale_x)
+        back_off = int(22 * self.game.scale_x)
+        front_off = int(12 * self.game.scale_x)
         if self.ducking:
-            return (self.x + back_off, self.ground - self.duck_h + 2, self.x + int(85 * self.game.scale_x) - front_off,
-                    self.ground - self.duck_h + self.duck_h - 2)
-        return (self.x + back_off, self.y + 2, self.x + int(85 * self.game.scale_x) - front_off,
-                self.y + self.dino_h - 2)
+            return (self.x + back_off, self.ground - self.duck_h + 12, self.x + int(85 * self.game.scale_x) - front_off,
+                    self.ground - self.duck_h + self.duck_h - 8)
+        return (self.x + back_off, self.y + 12, self.x + int(85 * self.game.scale_x) - front_off,
+                self.y + self.dino_h - 12)
 
     def reset(self):
         self.y = self.ground - self.dino_h
@@ -160,12 +160,23 @@ class Obstacle:
     def __init__(self, canvas, x, y, img, w, h, typ, game):
         self.canvas = canvas
         self.game = game
-        self.id = canvas.create_image(x, y, image=img, anchor="nw")
-        self.x, self.y, self.w, self.h, self.typ = x, y, w, h, typ
+        self.typ = typ
+        self.imgs = [img] if typ != "bird" else [img, ImageTk.PhotoImage(Image.open("assets/bird2.png").resize((w, h), Image.Resampling.LANCZOS))]
+        self.current = 0
+        self.id = canvas.create_image(x, y, image=self.imgs[0], anchor="nw")
+        self.x, self.y, self.w, self.h = x, y, w, h
+        self.cnt = 0
 
     def update(self, speed):
-        self.canvas.move(self.id, -speed, 0)
-        self.x -= speed
+        move = -speed * (1.8 if self.typ == "bird" else 1.0)
+        self.canvas.move(self.id, move, 0)
+        self.x += move
+        if self.typ == "bird":
+            self.cnt += 1
+            if self.cnt >= 6:
+                self.cnt = 0
+                self.current = 1 - self.current
+                self.canvas.itemconfig(self.id, image=self.imgs[self.current])
         return self.x < -150
 
     def hitbox(self):
@@ -175,63 +186,69 @@ class Obstacle:
     def delete(self):
         self.canvas.delete(self.id)
 
+def btn_hover_enter(event, obj, orig_x, orig_y):
+    if obj and hasattr(event.widget, 'tk'):
+        event.widget.coords(obj, orig_x + 5, orig_y + 5)
+
+def btn_hover_leave(event, obj, orig_x, orig_y):
+    if obj and hasattr(event.widget, 'tk'):
+        event.widget.coords(obj, orig_x, orig_y)
+
 class Menu:
     def __init__(self, canvas, game):
         self.canvas = canvas
         self.game = game
         self.images = {}
+        self.play_id = None
+        self.exit_id = None
+        self.play_x = self.play_y = self.exit_x = self.exit_y = 0
 
     def load(self):
         try:
-            self.images['back'] = ImageTk.PhotoImage(
-                Image.open("assets/back.png").resize((self.game.W, self.game.H), Image.Resampling.LANCZOS))
-            self.images['title'] = ImageTk.PhotoImage(Image.open("assets/dinosaurgamemenu.png").resize(
-                (int(550 * self.game.scale_x), int(220 * self.game.scale_y)), Image.Resampling.LANCZOS))
-            btn_w = int(168 * self.game.scale_x)
-            btn_h = int(34 * self.game.scale_y)
-            self.images['play'] = ImageTk.PhotoImage(
-                Image.open("assets/playmenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
-            self.images['exit'] = ImageTk.PhotoImage(
-                Image.open("assets/gooutmenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['back'] = ImageTk.PhotoImage(Image.open("assets/back.png").resize((self.game.W, self.game.H), Image.Resampling.LANCZOS))
+            self.images['title'] = ImageTk.PhotoImage(Image.open("assets/dinosaurgamemenu.png").resize((int(550 * self.game.scale_x), int(220 * self.game.scale_y)), Image.Resampling.LANCZOS))
+            btn_w, btn_h = int(200 * self.game.scale_x), int(50 * self.game.scale_y)
+            self.images['play'] = ImageTk.PhotoImage(Image.open("assets/playmenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['exit'] = ImageTk.PhotoImage(Image.open("assets/gooutmenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
             return True
-        except:
-            return False
+        except: return False
 
     def show(self):
         if not self.load(): return
         self.bg = self.canvas.create_image(0, 0, image=self.images['back'], anchor="nw")
         cx = self.game.W // 2
-        self.title = self.canvas.create_image(cx, int(self.game.H // 3 - 30 * self.game.scale_y),
-                                              image=self.images['title'], anchor="center")
-        self.play = self.canvas.create_image(cx, int(self.game.H // 2 + 121 * self.game.scale_y),
-                                             image=self.images['play'], anchor="center")
-        self.exit = self.canvas.create_image(cx, int(self.game.H // 2 + 165 * self.game.scale_y),
-                                             image=self.images['exit'], anchor="center")
-        self.canvas.tag_bind(self.play, "<Button-1>", self.game.start_game)
-        self.canvas.tag_bind(self.exit, "<Button-1>", lambda e: sys.exit())
+        self.title = self.canvas.create_image(cx, int(self.game.H // 3 - 30 * self.game.scale_y), image=self.images['title'], anchor="center")
+        self.play_x, self.play_y = cx, int(self.game.H // 2 + 121 * self.game.scale_y)
+        self.play_id = self.canvas.create_image(self.play_x, self.play_y, image=self.images['play'], anchor="center", tags=("btn", "play_btn"))
+        self.exit_x, self.exit_y = cx, int(self.game.H // 2 + 180 * self.game.scale_y)
+        self.exit_id = self.canvas.create_image(self.exit_x, self.exit_y, image=self.images['exit'], anchor="center", tags=("btn", "exit_btn"))
+        self.canvas.tag_bind("play_btn", "<Button-1>", self.game.start_game)
+        self.canvas.tag_bind("exit_btn", "<Button-1>", lambda e: sys.exit())
+        for btn, x, y in [(self.play_id, self.play_x, self.play_y), (self.exit_id, self.exit_x, self.exit_y)]:
+            self.canvas.tag_bind(btn, "<Enter>", lambda e, b=btn, ox=x, oy=y: btn_hover_enter(e, b, ox, oy))
+            self.canvas.tag_bind(btn, "<Leave>", lambda e, b=btn, ox=x, oy=y: btn_hover_leave(e, b, ox, oy))
 
     def hide(self):
-        for attr in ['bg', 'title', 'play', 'exit']:
-            if hasattr(self, attr): self.canvas.delete(getattr(self, attr))
+        for attr in ['bg', 'title', 'play_id', 'exit_id']:
+            if hasattr(self, attr) and getattr(self, attr):
+                self.canvas.delete(getattr(self, attr))
+        self.play_id = self.exit_id = None
 
 class GameOver:
     def __init__(self, canvas, game):
         self.canvas = canvas
         self.game = game
         self.images = {}
+        self.restart_id = self.menu_id = None
+        self.restart_x = self.restart_y = self.menu_x = self.menu_y = 0
 
     def load(self):
         try:
-            bg_w = int(500 * self.game.scale_x)
-            bg_h = int(300 * self.game.scale_y)
-            btn_w = int(180 * self.game.scale_x)
-            btn_h = int(40 * self.game.scale_y)
-            self.images['bg'] = ImageTk.PhotoImage(
-                Image.open("assets/gameovercanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
-            self.images['restart'] = ImageTk.PhotoImage(
-                Image.open("assets/go.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
-            self.images['menu'] = ImageTk.PhotoImage(
-                Image.open("assets/gomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            bg_w, bg_h = int(500 * self.game.scale_x), int(300 * self.game.scale_y)
+            btn_w, btn_h = int(180 * self.game.scale_x), int(40 * self.game.scale_y)
+            self.images['bg'] = ImageTk.PhotoImage(Image.open("assets/gameovercanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
+            self.images['restart'] = ImageTk.PhotoImage(Image.open("assets/go.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['menu'] = ImageTk.PhotoImage(Image.open("assets/gomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
             return True
         except: return False
 
@@ -239,74 +256,78 @@ class GameOver:
         if not self.load(): return
         cx, cy = self.game.W // 2, self.game.H // 2
         self.bg_id = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
-        self.restart_id = self.canvas.create_image(cx, cy + int(60 * self.game.scale_y), image=self.images['restart'],
-                                                   anchor="center")
-        self.menu_id = self.canvas.create_image(cx, cy + int(105 * self.game.scale_y), image=self.images['menu'],
-                                                anchor="center")
-        self.canvas.tag_bind(self.restart_id, "<Button-1>", self.game.restart_from_game_over)
-        self.canvas.tag_bind(self.menu_id, "<Button-1>", self.game.menu_from_game_over)
+        self.restart_x, self.restart_y = cx, cy + int(60 * self.game.scale_y)
+        self.restart_id = self.canvas.create_image(self.restart_x, self.restart_y, image=self.images['restart'], anchor="center", tags=("btn", "restart_btn"))
+        self.menu_x, self.menu_y = cx, cy + int(105 * self.game.scale_y)
+        self.menu_id = self.canvas.create_image(self.menu_x, self.menu_y, image=self.images['menu'], anchor="center", tags=("btn", "gameover_menu_btn"))
+        self.canvas.tag_bind("restart_btn", "<Button-1>", self.game.restart_from_game_over)
+        self.canvas.tag_bind("gameover_menu_btn", "<Button-1>", self.game.menu_from_game_over)
+        for btn, x, y in [(self.restart_id, self.restart_x, self.restart_y), (self.menu_id, self.menu_x, self.menu_y)]:
+            self.canvas.tag_bind(btn, "<Enter>", lambda e, b=btn, ox=x, oy=y: btn_hover_enter(e, b, ox, oy))
+            self.canvas.tag_bind(btn, "<Leave>", lambda e, b=btn, ox=x, oy=y: btn_hover_leave(e, b, ox, oy))
 
     def hide(self):
         for attr in ['bg_id', 'restart_id', 'menu_id']:
-            if hasattr(self, attr):
+            if hasattr(self, attr) and getattr(self, attr):
                 self.canvas.delete(getattr(self, attr))
+        self.restart_id = self.menu_id = None
 
 class PauseMenu:
     def __init__(self, canvas, game):
         self.canvas = canvas
         self.game = game
         self.images = {}
+        self.btn = self.cont_id = self.menu_id = None
+        self.btn_x = self.btn_y = self.cont_x = self.cont_y = self.menu_x = self.menu_y = 0
 
     def load(self):
         try:
             icon_size = int(35 * self.game.scale_x)
-            self.images['icon_pause'] = ImageTk.PhotoImage(
-                Image.open("assets/pause.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
-            self.images['icon_play'] = ImageTk.PhotoImage(
-                Image.open("assets/pause2.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
-            bg_w = int(500 * self.game.scale_x)
-            bg_h = int(300 * self.game.scale_y)
-            btn_w = int(180 * self.game.scale_x)
-            btn_h = int(40 * self.game.scale_y)
-            self.images['bg'] = ImageTk.PhotoImage(
-                Image.open("assets/pausecanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
-            self.images['cont'] = ImageTk.PhotoImage(
-                Image.open("assets/letsgo.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
-            self.images['menu'] = ImageTk.PhotoImage(
-                Image.open("assets/pausegomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['icon_pause'] = ImageTk.PhotoImage(Image.open("assets/pause.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
+            self.images['icon_play'] = ImageTk.PhotoImage(Image.open("assets/pause2.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
+            bg_w, bg_h = int(500 * self.game.scale_x), int(300 * self.game.scale_y)
+            btn_w, btn_h = int(180 * self.game.scale_x), int(40 * self.game.scale_y)
+            self.images['bg'] = ImageTk.PhotoImage(Image.open("assets/pausecanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
+            self.images['cont'] = ImageTk.PhotoImage(Image.open("assets/letsgo.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
+            self.images['menu'] = ImageTk.PhotoImage(Image.open("assets/pausegomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
             return True
         except: return False
 
     def show_button(self):
         if not self.images: self.load()
-        self.btn = self.canvas.create_image(self.game.W // 2, int(25 * self.game.scale_y),
-                                            image=self.images['icon_pause'], anchor="center")
-        self.canvas.tag_bind(self.btn, "<Button-1>", self.game.toggle_pause)
+        self.btn_x, self.btn_y = self.game.W // 2, int(25 * self.game.scale_y)
+        self.btn = self.canvas.create_image(self.btn_x, self.btn_y, image=self.images['icon_pause'], anchor="center", tags=("btn", "pause_btn"))
+        self.canvas.tag_bind("pause_btn", "<Button-1>", self.game.toggle_pause)
+        self.canvas.tag_bind("pause_btn", "<Enter>", lambda e: btn_hover_enter(e, self.btn, self.btn_x, self.btn_y) if not self.game.paused else None)
+        self.canvas.tag_bind("pause_btn", "<Leave>", lambda e: btn_hover_leave(e, self.btn, self.btn_x, self.btn_y) if not self.game.paused else None)
 
     def hide_button(self):
-        if hasattr(self, 'btn'): self.canvas.delete(self.btn)
+        if self.btn: self.canvas.delete(self.btn); self.btn = None
 
     def set_pause_icon(self):
-        if hasattr(self, 'btn') and self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_play'])
-
+        if self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_play'])
     def set_play_icon(self):
-        if hasattr(self, 'btn') and self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_pause'])
+        if self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_pause'])
 
     def show_screen(self):
         if not self.images: self.load()
         cx, cy = self.game.W // 2, self.game.H // 2
         self.bg_id = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
-        self.cont_id = self.canvas.create_image(cx, cy + int(60 * self.game.scale_y), image=self.images['cont'],
-                                                anchor="center")
-        self.menu_id = self.canvas.create_image(cx, cy + int(105 * self.game.scale_y), image=self.images['menu'],
-                                                anchor="center")
-        self.canvas.tag_bind(self.cont_id, "<Button-1>", self.game.resume_from_pause)
-        self.canvas.tag_bind(self.menu_id, "<Button-1>", self.game.menu_from_pause)
+        self.cont_x, self.cont_y = cx, cy + int(60 * self.game.scale_y)
+        self.cont_id = self.canvas.create_image(self.cont_x, self.cont_y, image=self.images['cont'], anchor="center", tags=("btn", "pause_cont_btn"))
+        self.menu_x, self.menu_y = cx, cy + int(105 * self.game.scale_y)
+        self.menu_id = self.canvas.create_image(self.menu_x, self.menu_y, image=self.images['menu'], anchor="center", tags=("btn", "pause_menu_btn"))
+        self.canvas.tag_bind("pause_cont_btn", "<Button-1>", self.game.resume_from_pause)
+        self.canvas.tag_bind("pause_menu_btn", "<Button-1>", self.game.menu_from_pause)
+        for btn, x, y in [(self.cont_id, self.cont_x, self.cont_y), (self.menu_id, self.menu_x, self.menu_y)]:
+            self.canvas.tag_bind(btn, "<Enter>", lambda e, b=btn, ox=x, oy=y: btn_hover_enter(e, b, ox, oy))
+            self.canvas.tag_bind(btn, "<Leave>", lambda e, b=btn, ox=x, oy=y: btn_hover_leave(e, b, ox, oy))
 
     def hide_screen(self):
         for attr in ['bg_id', 'cont_id', 'menu_id']:
-            if hasattr(self, attr):
+            if hasattr(self, attr) and getattr(self, attr):
                 self.canvas.delete(getattr(self, attr))
+        self.cont_id = self.menu_id = None
 
 class DinoGame:
     def __init__(self, root):
@@ -325,12 +346,8 @@ class DinoGame:
 
         self.ground_y = self.H - int(85 * self.scale_y)
 
-        self.bg = [
-            ParallaxLayer(self.canvas, f"assets/back10{i}.png", i, 0, self.W, self.H, self)
-            for i in range(1, 5)
-        ]
-        self.ground = ParallaxLayer(self.canvas, "assets/ground102.png", 8, self.ground_y - 10, self.W,
-                                    int(100 * self.scale_y), self)
+        self.bg = [ParallaxLayer(self.canvas, f"assets/back10{i}.png", i, 0, self.W, self.H, self) for i in range(1, 5)]
+        self.ground = ParallaxLayer(self.canvas, "assets/ground102.png", 8, self.ground_y - 10, self.W, int(100 * self.scale_y), self)
 
         self.menu = Menu(self.canvas, self)
         self.game_over = GameOver(self.canvas, self)
@@ -368,26 +385,26 @@ class DinoGame:
             'cactus3': (int(130 * self.scale_x), int(85 * self.scale_y)),
             'bird': (int(75 * self.scale_x), int(55 * self.scale_y))
         }
-        for name, file in [('cactus1', 'cactus.png'), ('cactus2', 'cactus2.png'), ('cactus3', 'cactus3.png'),
-                           ('bird', 'bird.png')]:
+        for name, file in [('cactus1', 'cactus.png'), ('cactus2', 'cactus2.png'), ('cactus3', 'cactus3.png')]:
             try:
                 w, h = sizes[name]
-                img = Image.open(f"assets/{file}").resize((w, h), Image.Resampling.LANCZOS)
-                self.tex[name] = ImageTk.PhotoImage(img)
+                self.tex[name] = ImageTk.PhotoImage(Image.open(f"assets/{file}").resize((w, h), Image.Resampling.LANCZOS))
             except: pass
+        try:
+            w, h = sizes['bird']
+            self.tex['bird'] = ImageTk.PhotoImage(Image.open("assets/bird.png").resize((w, h), Image.Resampling.LANCZOS))
+        except: pass
 
     def load_high_score(self):
         try:
             if os.path.exists("high_score.json"):
-                with open("high_score.json", "r") as f:
-                    return json.load(f).get("high_score", 0)
+                with open("high_score.json", "r") as f: return json.load(f).get("high_score", 0)
         except: pass
         return 0
 
     def save_high_score(self):
         try:
-            with open("high_score.json", "w") as f:
-                json.dump({"high_score": self.high_score}, f)
+            with open("high_score.json", "w") as f: json.dump({"high_score": self.high_score}, f)
         except: pass
 
     def start_game(self, event=None):
@@ -395,12 +412,8 @@ class DinoGame:
         self.menu.hide()
         self.dino = Dino(self.canvas, int(150 * self.scale_x), self.ground_y, self)
         self.canvas.tag_raise(self.dino.id)
-        self.score_text = self.canvas.create_text(self.W - int(80 * self.scale_x), int(30 * self.scale_y),
-                                                  text=f"Счет: {self.score}",
-                                                  font=("Arial", int(18 * self.scale_y), "bold"), fill="black")
-        self.high_score_text = self.canvas.create_text(self.W - int(80 * self.scale_x), int(60 * self.scale_y),
-                                                       text=f"Рекорд: {self.high_score}",
-                                                       font=("Arial", int(14 * self.scale_y), "bold"), fill="black")
+        self.score_text = self.canvas.create_text(self.W - int(80 * self.scale_x), int(30 * self.scale_y), text=f"Счет: {self.score}", font=("Arial", int(18 * self.scale_y), "bold"), fill="black")
+        self.high_score_text = self.canvas.create_text(self.W - int(80 * self.scale_x), int(60 * self.scale_y), text=f"Рекорд: {self.high_score}", font=("Arial", int(14 * self.scale_y), "bold"), fill="black")
         self.pause_menu.show_button()
         self.root.bind("<space>", self.handle_space)
         self.root.bind("<Up>", self.handle_space)
@@ -410,93 +423,54 @@ class DinoGame:
         self.update()
 
     def handle_down(self, e):
-        if not self.game_over_flag and not self.paused and self.dino:
-            self.dino.start_duck()
-
+        if not self.game_over_flag and not self.paused and self.dino: self.dino.start_duck()
     def handle_down_release(self, e):
-        if not self.game_over_flag and not self.paused and self.dino:
-            self.dino.stop_duck()
-
+        if not self.game_over_flag and not self.paused and self.dino: self.dino.stop_duck()
     def handle_space(self, e):
-        if self.game_over_flag:
-            self.restart_from_game_over(e)
-        elif not self.paused and self.dino:
-            self.dino.jump()
+        if self.game_over_flag: self.restart_from_game_over(e)
+        elif not self.paused and self.dino: self.dino.jump()
 
     def toggle_pause(self, e=None):
-        if self.dino is None or self.game_over_flag:
+        if self.dino is None or self.game_over_flag: return
+        if e and e.keysym == "Escape" and self.paused:
+            self.resume_from_pause(None)
+            return
+        if self.paused:
             return
         if not self.paused:
             self.paused = True
             self.pause_menu.set_pause_icon()
             if self.spawn_id:
-                self.root.after_cancel(self.spawn_id)
-                self.spawn_id = None
-                now = time.time() * 1000
-                self.pause_remaining = max(0, self.next_spawn_time - now)
+                self.root.after_cancel(self.spawn_id); self.spawn_id = None
+                self.pause_remaining = max(0, self.next_spawn_time - time.time() * 1000)
             self.pause_menu.show_screen()
-        else:
-            self.resume_from_pause(None)
 
     def resume_from_pause(self, e):
         self.pause_menu.hide_screen()
         self.paused = False
         self.pause_menu.set_play_icon()
         if not self.game_over_flag and self.spawn_id is None:
-            if self.pause_remaining > 0:
-                self.spawn_id = self.root.after(int(self.pause_remaining), self.spawn_obstacle)
-            else:
-                self.spawn_obstacle()
+            if self.pause_remaining > 0: self.spawn_id = self.root.after(int(self.pause_remaining), self.spawn_obstacle)
+            else: self.spawn_obstacle()
             self.pause_remaining = 0
 
-    def menu_from_pause(self, e):
-        self.pause_menu.hide_screen()
-        self.full_restart()
-        self.menu.show()
-
-    def restart_from_game_over(self, e):
-        self.game_over.hide()
-        self.full_restart()
-        self.start_game()
-
-    def menu_from_game_over(self, e):
-        self.game_over.hide()
-        self.full_restart()
-        self.menu.show()
+    def menu_from_pause(self, e): self.pause_menu.hide_screen(); self.full_restart(); self.menu.show()
+    def restart_from_game_over(self, e): self.game_over.hide(); self.full_restart(); self.start_game()
+    def menu_from_game_over(self, e): self.game_over.hide(); self.full_restart(); self.menu.show()
 
     def full_restart(self):
-        if self.update_id:
-            self.root.after_cancel(self.update_id)
-            self.update_id = None
-        if self.spawn_id:
-            self.root.after_cancel(self.spawn_id)
-            self.spawn_id = None
-        for o in self.obstacles:
-            o.delete()
+        if self.update_id: self.root.after_cancel(self.update_id); self.update_id = None
+        if self.spawn_id: self.root.after_cancel(self.spawn_id); self.spawn_id = None
+        for o in self.obstacles: o.delete()
         self.obstacles.clear()
-        for l in self.bg:
-            l.reset()
+        for l in self.bg: l.reset()
         self.ground.reset()
-        if self.dino:
-            self.dino.reset()
-        if self.score_text:
-            self.canvas.delete(self.score_text)
-            self.score_text = None
-        if self.high_score_text:
-            self.canvas.delete(self.high_score_text)
-            self.high_score_text = None
-        self.game_over_flag = False
-        self.paused = False
-        self.score = 0
-        self.speed = BASE_SPEED
-        self.next_up = 500
-        self.frame = 0
-        self.pause_menu.hide_button()
-        self.pause_menu.hide_screen()
-        self.game_over.hide()
-        self.spawn_id = None
-        self.next_spawn_time = 0
-        self.pause_remaining = 0
+        if self.dino: self.dino.reset()
+        if self.score_text: self.canvas.delete(self.score_text); self.score_text = None
+        if self.high_score_text: self.canvas.delete(self.high_score_text); self.high_score_text = None
+        self.game_over_flag = False; self.paused = False; self.score = 0; self.speed = BASE_SPEED; self.next_up = 500; self.frame = 0
+        self.pause_menu.hide_button(); self.pause_menu.hide_screen(); self.game_over.hide()
+        self.spawn_id = None; self.next_spawn_time = 0; self.pause_remaining = 0
 
     def spawn_obstacle(self):
         if not self.game_over_flag and not self.paused:
@@ -507,25 +481,22 @@ class DinoGame:
                 w = self.tex[typ].width()
                 y = self.ground_y - int(85 * self.scale_y)
                 h = int(85 * self.scale_y)
+                self.obstacles.append(Obstacle(self.canvas, self.W, y, img, w, h, typ, self))
             else:
                 img = self.tex['bird']
                 w = self.tex['bird'].width()
                 h = int(55 * self.scale_y)
-                y = self.ground_y - random.choice(
-                    [int(170 * self.scale_y), int(140 * self.scale_y), int(110 * self.scale_y)])
-            self.obstacles.append(Obstacle(self.canvas, self.W, y, img, w, h, "cactus" if r <= 70 else "bird", self))
+                y = self.ground_y - random.choice([int(170 * self.scale_y), int(140 * self.scale_y), int(110 * self.scale_y)])
+                self.obstacles.append(Obstacle(self.canvas, self.W, y, img, w, h, "bird", self))
             d = max(800, random.randint(MIN_SPAWN_DELAY, MAX_SPAWN_DELAY) - int(self.speed * 3))
             self.next_spawn_time = time.time() * 1000 + d
             self.spawn_id = self.root.after(d, self.spawn_obstacle)
 
     def update(self):
         if not self.paused and not self.game_over_flag:
-            for l in self.bg:
-                l.update(self.speed)
+            for l in self.bg: l.update(self.speed)
             self.ground.update(self.speed)
-            if self.dino:
-                self.dino.update_physics()
-                self.dino.update_animation()
+            if self.dino: self.dino.update_physics(); self.dino.update_animation()
             for o in self.obstacles[:]:
                 if o.update(self.speed):
                     self.obstacles.remove(o)
@@ -534,31 +505,23 @@ class DinoGame:
             if self.frame % 2 == 0:
                 if not self.game_over_flag:
                     self.score += 1
-                    if self.score_text:
-                        self.canvas.itemconfig(self.score_text, text=f"Счет: {self.score}")
-                    if self.score > self.high_score:
-                        self.high_score = self.score
-                        if self.high_score_text:
-                            self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
-                        self.save_high_score()
-                    if self.score >= self.next_up:
-                        self.speed += 2
-                        self.next_up += 500
+                    if self.score_text: self.canvas.itemconfig(self.score_text, text=f"Счет: {self.score}")
+                    if self.score > self.high_score: self.high_score = self.score
+                    if self.high_score_text: self.canvas.itemconfig(self.high_score_text, text=f"Рекорд: {self.high_score}")
+                    self.save_high_score()
+                    if self.score >= self.next_up: self.speed += 2; self.next_up += 500
             self.check_collisions()
         self.update_id = self.root.after(25, self.update)
 
     def check_collisions(self):
-        if not self.dino or self.game_over_flag:
-            return
+        if not self.dino or self.game_over_flag: return
         dl, dt, dr, db = self.dino.hitbox()
         for o in self.obstacles:
             ol, ot, or_, ob = o.hitbox()
             if dl < or_ and dr > ol and dt < ob and db > ot:
                 self.game_over_flag = True
                 self.dino.set_dead()
-                if self.spawn_id:
-                    self.root.after_cancel(self.spawn_id)
-                    self.spawn_id = None
+                if self.spawn_id: self.root.after_cancel(self.spawn_id); self.spawn_id = None
                 self.pause_menu.hide_button()
                 self.game_over.show()
                 return
