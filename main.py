@@ -139,11 +139,13 @@ class Dino:
         self.canvas.itemconfig(self.id, image=self.cur)
 
     def hitbox(self):
-        off = int(10 * self.game.scale_x)
+        back_off = int(10 * self.game.scale_x)
+        front_off = int(2 * self.game.scale_x)
         if self.ducking:
-            return (self.x + off, self.ground - self.duck_h + 10, self.x + int(85 * self.game.scale_x) - off,
-                    self.ground - self.duck_h + 50)
-        return (self.x + off, self.y + 10, self.x + int(85 * self.game.scale_x) - off, self.y + 75)
+            return (self.x + back_off, self.ground - self.duck_h + 2, self.x + int(85 * self.game.scale_x) - front_off,
+                    self.ground - self.duck_h + self.duck_h - 2)
+        return (self.x + back_off, self.y + 2, self.x + int(85 * self.game.scale_x) - front_off,
+                self.y + self.dino_h - 2)
 
     def reset(self):
         self.y = self.ground - self.dino_h
@@ -167,8 +169,8 @@ class Obstacle:
         return self.x < -150
 
     def hitbox(self):
-        off = int(8 * self.game.scale_x)
-        return (self.x + off, self.y + 10, self.x + self.w - off, self.y + self.h - 10)
+        off = int(2 * self.game.scale_x)
+        return (self.x + off, self.y + 22, self.x + self.w - off, self.y + self.h - 22)
 
     def delete(self):
         self.canvas.delete(self.id)
@@ -220,10 +222,10 @@ class GameOver:
 
     def load(self):
         try:
-            bg_w = int(300 * self.game.scale_x)
+            bg_w = int(500 * self.game.scale_x)
             bg_h = int(300 * self.game.scale_y)
-            btn_w = int(251 * self.game.scale_x)
-            btn_h = int(35 * self.game.scale_y)
+            btn_w = int(180 * self.game.scale_x)
+            btn_h = int(40 * self.game.scale_y)
             self.images['bg'] = ImageTk.PhotoImage(
                 Image.open("assets/gameovercanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
             self.images['restart'] = ImageTk.PhotoImage(
@@ -231,11 +233,11 @@ class GameOver:
             self.images['menu'] = ImageTk.PhotoImage(
                 Image.open("assets/gomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
             return True
-        except:
-            return False
+        except: return False
 
     def show(self):
-        if not self.load(): return
+        if not self.load():
+            return
         cx, cy = self.game.W // 2, self.game.H // 2
         self.bg_id = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
         self.restart_id = self.canvas.create_image(cx, cy + int(60 * self.game.scale_y), image=self.images['restart'],
@@ -247,7 +249,8 @@ class GameOver:
 
     def hide(self):
         for attr in ['bg_id', 'restart_id', 'menu_id']:
-            if hasattr(self, attr): self.canvas.delete(getattr(self, attr))
+            if hasattr(self, attr):
+                self.canvas.delete(getattr(self, attr))
 
 class PauseMenu:
     def __init__(self, canvas, game):
@@ -258,12 +261,14 @@ class PauseMenu:
     def load(self):
         try:
             icon_size = int(35 * self.game.scale_x)
-            self.images['icon'] = ImageTk.PhotoImage(
+            self.images['icon_pause'] = ImageTk.PhotoImage(
                 Image.open("assets/pause.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
-            bg_w = int(300 * self.game.scale_x)
+            self.images['icon_play'] = ImageTk.PhotoImage(
+                Image.open("assets/pause2.png").resize((icon_size, icon_size), Image.Resampling.LANCZOS))
+            bg_w = int(500 * self.game.scale_x)
             bg_h = int(300 * self.game.scale_y)
-            btn_w = int(251 * self.game.scale_x)
-            btn_h = int(35 * self.game.scale_y)
+            btn_w = int(180 * self.game.scale_x)
+            btn_h = int(40 * self.game.scale_y)
             self.images['bg'] = ImageTk.PhotoImage(
                 Image.open("assets/pausecanvas.png").resize((bg_w, bg_h), Image.Resampling.LANCZOS))
             self.images['cont'] = ImageTk.PhotoImage(
@@ -271,17 +276,23 @@ class PauseMenu:
             self.images['menu'] = ImageTk.PhotoImage(
                 Image.open("assets/pausegomenu.png").resize((btn_w, btn_h), Image.Resampling.LANCZOS))
             return True
-        except:
-            return False
+        except: return False
 
     def show_button(self):
-        if not self.images: self.load()
-        self.btn = self.canvas.create_image(self.game.W // 2, int(25 * self.game.scale_y), image=self.images['icon'],
-                                            anchor="center")
+        if not self.images:
+            self.load()
+        self.btn = self.canvas.create_image(self.game.W // 2, int(25 * self.game.scale_y),
+                                            image=self.images['icon_pause'], anchor="center")
         self.canvas.tag_bind(self.btn, "<Button-1>", self.game.toggle_pause)
 
     def hide_button(self):
         if hasattr(self, 'btn'): self.canvas.delete(self.btn)
+
+    def set_pause_icon(self):
+        if hasattr(self, 'btn') and self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_play'])
+
+    def set_play_icon(self):
+        if hasattr(self, 'btn') and self.btn: self.canvas.itemconfig(self.btn, image=self.images['icon_pause'])
 
     def show_screen(self):
         if not self.images: self.load()
@@ -296,7 +307,8 @@ class PauseMenu:
 
     def hide_screen(self):
         for attr in ['bg_id', 'cont_id', 'menu_id']:
-            if hasattr(self, attr): self.canvas.delete(getattr(self, attr))
+            if hasattr(self, attr):
+                self.canvas.delete(getattr(self, attr))
 
 class DinoGame:
     def __init__(self, root):
@@ -336,7 +348,7 @@ class DinoGame:
         self.next_up = 500
         self.update_id = None
         self.spawn_id = None
-        self.next_spawn_time = 0 
+        self.next_spawn_time = 0
         self.pause_remaining = 0
         self.frame = 0
         self.high_score = self.load_high_score()
@@ -364,24 +376,21 @@ class DinoGame:
                 w, h = sizes[name]
                 img = Image.open(f"assets/{file}").resize((w, h), Image.Resampling.LANCZOS)
                 self.tex[name] = ImageTk.PhotoImage(img)
-            except:
-                pass
+            except: pass
 
     def load_high_score(self):
         try:
             if os.path.exists("high_score.json"):
                 with open("high_score.json", "r") as f:
                     return json.load(f).get("high_score", 0)
-        except:
-            pass
+        except: pass
         return 0
 
     def save_high_score(self):
         try:
             with open("high_score.json", "w") as f:
                 json.dump({"high_score": self.high_score}, f)
-        except:
-            pass
+        except: pass
 
     def start_game(self, event=None):
         self.full_restart()
@@ -417,22 +426,22 @@ class DinoGame:
             self.dino.jump()
 
     def toggle_pause(self, e=None):
-        if self.game_over_flag:
-            return
+        if self.game_over_flag: return
         if not self.paused:
             self.paused = True
+            self.pause_menu.set_pause_icon()
             if self.spawn_id:
                 self.root.after_cancel(self.spawn_id)
                 self.spawn_id = None
                 now = time.time() * 1000
                 self.pause_remaining = max(0, self.next_spawn_time - now)
             self.pause_menu.show_screen()
-        else:
-            self.resume_from_pause(None)
+        else: self.resume_from_pause(None)
 
     def resume_from_pause(self, e):
         self.pause_menu.hide_screen()
         self.paused = False
+        self.pause_menu.set_play_icon()
         if not self.game_over_flag and self.spawn_id is None:
             if self.pause_remaining > 0:
                 self.spawn_id = self.root.after(int(self.pause_remaining), self.spawn_obstacle)
