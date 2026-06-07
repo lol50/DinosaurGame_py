@@ -236,8 +236,7 @@ class GameOver:
         except: return False
 
     def show(self):
-        if not self.load():
-            return
+        if not self.load(): return
         cx, cy = self.game.W // 2, self.game.H // 2
         self.bg_id = self.canvas.create_image(cx, cy, image=self.images['bg'], anchor="center")
         self.restart_id = self.canvas.create_image(cx, cy + int(60 * self.game.scale_y), image=self.images['restart'],
@@ -279,8 +278,7 @@ class PauseMenu:
         except: return False
 
     def show_button(self):
-        if not self.images:
-            self.load()
+        if not self.images: self.load()
         self.btn = self.canvas.create_image(self.game.W // 2, int(25 * self.game.scale_y),
                                             image=self.images['icon_pause'], anchor="center")
         self.canvas.tag_bind(self.btn, "<Button-1>", self.game.toggle_pause)
@@ -426,7 +424,8 @@ class DinoGame:
             self.dino.jump()
 
     def toggle_pause(self, e=None):
-        if self.game_over_flag: return
+        if self.dino is None or self.game_over_flag:
+            return
         if not self.paused:
             self.paused = True
             self.pause_menu.set_pause_icon()
@@ -436,7 +435,8 @@ class DinoGame:
                 now = time.time() * 1000
                 self.pause_remaining = max(0, self.next_spawn_time - now)
             self.pause_menu.show_screen()
-        else: self.resume_from_pause(None)
+        else:
+            self.resume_from_pause(None)
 
     def resume_from_pause(self, e):
         self.pause_menu.hide_screen()
